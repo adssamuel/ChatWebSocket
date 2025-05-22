@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Chat Básico</title>
+  <style>
+    #mensagens {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: #fafafa;
+    }
+
+    .mensagem {
+      display: flex;
+      align-items: flex-end;
+      margin: 10px 0;
+      max-width: 70%;
+      padding: 10px;
+      border-radius: 10px;
+      position: relative;
+      clear: both;
+      opacity: 0;
+      animation: fadeIn 0.3s ease forwards;
+    }
+
+    .minha {
+      background-color: #d1ffd1;
+      margin-left: auto;
+      text-align: right;
+      flex-direction: row-reverse;
+    }
+
+    .outra {
+      background-color: #f1f1f1;
+      margin-right: auto;
+      text-align: left;
+    }
+
+    .sistema {
+      background-color: #fff3cd;
+      border: 1px solid #ffeeba;
+      margin: 0 auto;
+      text-align: center;
+      justify-content: center;
+    }
+
+    .avatar {
+      font-size: 24px;
+      margin: 0 10px;
+    }
+
+    .texto {
+      font-size: 14px;
+      word-break: break-word;
+    }
+
+    .hora {
+      font-size: 10px;
+      color: #888;
+      position: absolute;
+      bottom: 3px;
+      right: 8px;
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="login">
+    <input type="text" id="nome" placeholder="Digite seu nome">
+    <button onclick="conectar()">Entrar</button>
+  </div>
+
+  <div id="chat" style="display: none;">
+    <div id="mensagens"></div>
+    <input type="text" id="msg" placeholder="Digite sua mensagem">
+    <button onclick="enviar()">Enviar</button>
+  </div>
+
+  <script>
+  let ws;
+  let nome = "";
+
+  function conectar() {
+    nome = document.getElementById("nome").value.trim();
+    if (!nome) return;
+
+    ws = new WebSocket('ws://' + location.host + location.pathname.replace(/\/[^/]*$/, '') + '/chat?nome=' + encodeURIComponent(nome));
+
+    ws.onmessage = e => {
+    	  const container = document.getElementById("mensagens");
+    	  const mensagem = e.data;
+
+    	  const partes = mensagem.includes(":") ? mensagem.split(":") : [null, mensagem];
+    	  const remetente = partes[0]?.trim();
+    	  const conteudo = partes.slice(1).join(":").trim();
+    	  const ehMinha = remetente && remetente.toLowerCase() === nome.toLowerCase();
+
+    	  // Ignora a própria mensagem que foi ecoada pelo servidor
+    	  if (ehMinha) return;
+
+    	  const div = document.createElement("div");
+    	  let classe = "";
+
+    	  if (!remetente) {
+    	    classe = "mensagem sistema";
+    	  } else {
+    	    classe = `mensagem outra`;
+    	  }
+
+    	  div.className = classe;
+
+    	  const avatar = document.createElement("div");
+    	  avatar.className = "avatar";
+
+    	  if (!remetente) {
+    	    avatar.innerText = "📢";
+    	  } else {
+    	    avatar.innerText = gerarEmoji(remetente);
+    	  }
+
+    	  const texto = document.createElement("div");
+    	  texto.className = "texto";
+    	  texto.innerText = mensagem;
+
+    	  const hora = document.createElement("div");
+    	  hora.className = "hora";
+    	  hora.innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    	  div.appendChild(avatar);
+    	  div.appendChild(texto);
+    	  div.appendChild(hora);
+
+    	  container.appendChild(div);
+    	  container.scrollTop = container.scrollHeight;
+    	};
+
+
+    document.getElementById("login").style.display = "none";
+    document.getElementById("chat").style.display = "block";
+  }
+
+  function enviar() {
+	  const input = document.getElementById("msg");
+	  const texto = input.value.trim();
+	  if (texto && ws && ws.readyState === WebSocket.OPEN) {
+	    adicionarMensagemLocal(`${nome}: ${texto}`, true); // já adiciona no DOM como 'minha'
+	    ws.send(texto);
+	    input.value = "";
+	  }
+	}
+
+  function adicionarMensagemLocal(mensagem, ehMinha) {
+	  const container = document.getElementById("mensagens");
+	  const partes = mensagem.includes(":") ? mensagem.split(":") : [null, mensagem];
+	  const remetente = partes[0]?.trim();
+	  const conteudo = partes.slice(1).join(":").trim();
+
+	  const div = document.createElement("div");
+	  div.className = `mensagem ${ehMinha ? 'minha' : 'outra'}`;
+
+	  const avatar = document.createElement("div");
+	  avatar.className = "avatar";
+	  if (!remetente) {
+	    avatar.innerText = "📢";
+	  } else if (ehMinha) {
+	    avatar.innerText = "🙋";
+	  } else {
+	    avatar.innerText = gerarEmoji(remetente);
+	  }
+
+	  const texto = document.createElement("div");
+	  texto.className = "texto";
+	  texto.innerText = mensagem;
+
+	  const hora = document.createElement("div");
+	  hora.className = "hora";
+	  hora.innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+	  div.appendChild(avatar);
+	  div.appendChild(texto);
+	  div.appendChild(hora);
+
+	  container.appendChild(div);
+	  container.scrollTop = container.scrollHeight;
+	}
+	  
+	
+  function gerarEmoji(nome) {
+    const emojis = ["🐱", "🐶", "🦊", "🐻", "🐼", "🐸", "🐵", "🐧", "🐔", "🦄", "🐯", "🐨", "🐮", "🐷", "🐹", "🦉"];
+    let hash = 0;
+    for (let i = 0; i < nome.length; i++) {
+      hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % emojis.length;
+    return emojis[index];
+  }
+
+  function gerarclass(nome) {
+	    const emojis = ["🐱", "🐶", "🦊", "🐻", "🐼", "🐸", "🐵", "🐧", "🐔", "🦄", "🐯", "🐨", "🐮", "🐷", "🐹", "🦉"];
+	    let hash = 0;
+	    for (let i = 0; i < nome.length; i++) {
+	      hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+	    }
+	    const index = Math.abs(hash) % emojis.length;
+	    return emojis[index];
+	  }
+</script>
+
+</body>
+</html>
